@@ -14,56 +14,94 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const db_1 = require("./db");
-const app = (0, express_1.default)();
-const bcrypt_1 = __importDefault(require("bcrypt"));
+const cors_1 = __importDefault(require("cors"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const middleware_1 = require("./middleware");
+const utils_1 = require("./utils");
+const JWT_SECRET = "code";
+const app = (0, express_1.default)();
 app.use(express_1.default.json());
-app.listen(8080, () => {
-    console.log('Server is running on port 8080');
-});
-app.post("/api/vi/signup", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    //validate the data and a
-    const { username, password } = req.body;
-    const user = yield db_1.UserModel.findOne({ username });
-    if (user) {
-        return res.status(400).json({ message: "User already exists" });
+app.use((0, cors_1.default)({ origin: "http://localhost:5173" }));
+app.post("/api/v1/signup", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const username = req.body.username;
+    const password = req.body.password;
+    try {
+        yield db_1.UserModel.create({ username, password });
+        res.json({ message: "User signed up" });
     }
-    //hash the password
-    const hashedPassword = yield bcrypt_1.default.hash(password, 10);
-    db_1.UserModel.create({ username, password: hashedPassword });
-    res.json({ message: "User created successfully" });
+    catch (e) {
+        res.status(409).json({ message: "User already exists" });
+    }
 }));
-app.post("/api/vi/signin", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { username, password } = req.body;
-    const user = yield db_1.UserModel.findOne({ username });
+app.post("/api/v1/signin", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const username = req.body.username;
+    const password = req.body.password;
+    const existingUser = yield db_1.UserModel.findOne({ username, password });
+    if (existingUser) {
+        const token = jsonwebtoken_1.default.sign({ id: existingUser._id }, JWT_SECRET);
+        res.json({ token });
+    }
+    else {
+        res.status(403).json({ message: "Incorrect credentials" });
+    }
+}));
+app.post("/api/v1/content", middleware_1.userMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { link, type, title } = req.body;
+    yield db_1.ContentModel.create({
+        link,
+        type,
+        title,
+        userId: req.userId,
+        tags: []
+    });
+    res.json({ message: "Content added" });
+}));
+app.get("/api/v1/content", middleware_1.userMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    //@ts-ignore
+    const userId = req.userId;
+    const content = yield db_1.ContentModel.find({ userId: userId }).populate("userId", "username");
+    res.json(content);
+}));
+app.delete("/api/v1/content", middleware_1.userMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const contentId = req.body.contentId;
+    yield db_1.ContentModel.deleteMany({ contentId, userId: req.userId });
+    res.json({ message: "Deleted" });
+}));
+app.post("/api/v1/brain/share", middleware_1.userMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { share } = req.body;
+    if (share) {
+        const existingLink = yield db_1.LinkModel.findOne({ userId: req.userId });
+        if (existingLink) {
+            res.json({ hash: existingLink.hash });
+            return;
+        }
+        const hash = (0, utils_1.random)(10);
+        yield db_1.LinkModel.create({ userId: req.userId, hash });
+        res.json({ hash });
+    }
+    else {
+        yield db_1.LinkModel.deleteOne({ userId: req.userId });
+        res.json({ message: "Removed link" });
+    }
+}));
+app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const hash = req.params.shareLink;
+    const link = yield db_1.LinkModel.findOne({ hash });
+    if (!link) {
+        res.status(404).json({ message: "Invalid share link" });
+        return;
+    }
+    const content = yield db_1.ContentModel.find({ userId: link.userId });
+    const user = yield db_1.UserModel.findOne({ _id: link.userId });
     if (!user) {
-        return res.status(400).json({ message: "User not found" });
+        res.status(404).json({ message: "User not found" });
+        return;
     }
-    if (!user.password) {
-        return res.status(400).json({ message: "User has no password set" });
-    }
-    const isPasswordValid = yield bcrypt_1.default.compare(password, user.password);
-    if (!isPasswordValid) {
-        return res.status(401).json({ message: "Invalid password" });
-    }
-    const payload = { id: user._id };
-    const token = jsonwebtoken_1.default.sign(payload, "code", { expiresIn: "1h" });
-    res.json({ token });
+    res.json({
+        username: user.username,
+        content
+    });
 }));
-app.post("/api/vi/content", middleware_1.authMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { title, link } = req.body;
-    //@ts-ignore
-    const content = yield db_1.ContentModel.create({ title, link, userId: req.userId, tags: [] });
-    res.json({ message: "Content created successfully", content });
-}));
-app.get("/api/vi/content", middleware_1.authMiddleware, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    //@ts-ignore
-    const content = yield db_1.ContentModel.find({ userId: req.userId });
-    res.json({ content });
-}));
-app.delete("/api/vi/content", (req, res) => { });
-app.post("/api/vi/share", (req, res) => { });
-app.post("/api/vi/share", (req, res) => { });
-app.get("/get/v1/brain/:shareLink", (req, res) => {
+app.listen(8080, () => {
+    console.log("Server is running on port 3000");
 });

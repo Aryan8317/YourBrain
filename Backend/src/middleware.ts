@@ -1,19 +1,15 @@
 import { NextFunction, Request, Response } from "express";
-import  jwt  from "jsonwebtoken";
+import { JWT_SECRET } from './config';
+import jwt from "jsonwebtoken";
 
-
-export const authMiddleware = (req:Request, res :Response, next:NextFunction) => {
-    const token = req.headers.authorization;
-    if (!token) {
-        return res.status(401).json({ message: "Unauthorized" });
+export const userMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    const header = req.headers["authorization"];
+    const decoded = jwt.verify(header as string, JWT_SECRET);
+    if (decoded) {
+        // @ts-ignore
+        req.userId = decoded.id;
+        next();
+    } else {
+        res.status(401).json({ message: "Unauthorized User" });
     }
-    const decoded = jwt.verify(token, "code");
-    if(!decoded){
-        return res.status(401).json({ message: "Unauthorized" });
-    }
-    //@ts-ignore
-    req.userId = decoded.id;
-    next();
-    
-}
-// how to override the types of the expres request obejct
+};

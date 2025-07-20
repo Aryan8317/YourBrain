@@ -1,22 +1,30 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authMiddleware = void 0;
+exports.userMiddleware = void 0;
+const config_1 = require("./config");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const authMiddleware = (req, res, next) => {
-    const token = req.headers.authorization;
-    if (!token) {
-        return res.status(401).json({ message: "Unauthorized" });
+const userMiddleware = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const header = req.headers["authorization"];
+    const decoded = jsonwebtoken_1.default.verify(header, config_1.JWT_SECRET);
+    if (decoded) {
+        // @ts-ignore
+        req.userId = decoded.id;
+        next();
     }
-    const decoded = jsonwebtoken_1.default.verify(token, "code");
-    if (!decoded) {
-        return res.status(401).json({ message: "Unauthorized" });
+    else {
+        res.status(401).json({ message: "Unauthorized User" });
     }
-    //@ts-ignore
-    req.userId = decoded.id;
-    next();
-};
-exports.authMiddleware = authMiddleware;
-// how to override the types of the expres request obejct
+});
+exports.userMiddleware = userMiddleware;
