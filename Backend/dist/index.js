@@ -103,5 +103,5 @@ app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void
     });
 }));
 app.listen(8080, () => {
-    console.log("Server is running on port 3000");
+    console.log("Server is running on port 8080");
 });
