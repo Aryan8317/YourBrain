@@ -1,6 +1,6 @@
 import mongoose, { model, Schema } from "mongoose";
 
-mongoose.connect("mongodb+srv://starkarya8317:182uzP6LvHKv9JG0@yourname.ccd0rxw.mongodb.net/").then(()=>
+mongoose.connect("Your connection string").then(()=>
     console.log("connected to db")
 ).catch(()=>console.log("db connection failed"));
 
